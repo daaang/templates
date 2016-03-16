@@ -58,27 +58,41 @@ while getopts ":h" opt; do
   esac
 done
 
+# Shift so that the first "real" argument is $1.
 shift $((OPTIND - 1))
 
+# Be sure we have at least one argument.
 if [ -z "$1" ]; then
   errorout "expected at least one argument"
 fi
 
+# Here's what we expect from the command line.
 filename="$1"
 runtype="${2:-$RUN_TYPE}"
 
 if ! [ -e "$filename" ]; then
+  # If the file doesn't already exist, then we take a look at our run
+  # type.
   if [ "${runtype:0:1}" = "/" ]; then
+    # If the run type begins with a slash, then we'll assume it's an
+    # absolute path and check for existance.
     if [ -e "$runtype" ]; then
+      # Cool! We set the shebang to that exactly.
       echo "#!$runtype" > "$filename"
 
     else
+      # Otherwise, we error out. I'm not going to do anything
+      # exceptional for absolute shebangs that won't work.
       errorout "Absolute path does not exist: $runtype"
     fi
 
   else
+    # If the run type doesn't begin with a slash, then check whether we
+    # have a template for it in particular.
     case "$runtype" in
       "bash")
+        # I like my bash scripts to have colorful logging, basic
+        # argument parsing, and a help printout.
         cat <<- EOSF > "$filename"
 	#!/usr/bin/env $runtype
 	USAGE="usage: \$0 [-h] OTHER_ARGS_ETC"
@@ -131,6 +145,7 @@ if ! [ -e "$filename" ]; then
 	  esac
 	done
 
+	# Shift so that the first "real" argument is \$1.
 	shift \$((OPTIND - 1))
 
 	# Your code begins here.
@@ -138,6 +153,8 @@ if ! [ -e "$filename" ]; then
         ;;
 
       "python3")
+        # I like my python scripts to be ready-to-go with argument
+        # parsing.
         cat <<- EOSF > "$filename"
 	#!/usr/bin/env $runtype
 	from argparse           import  ArgumentParser
@@ -174,21 +191,29 @@ if ! [ -e "$filename" ]; then
         ;;
 
       *)
+        # I haven't made templates for anything else yet.
         echo "#!/usr/bin/env $runtype" > "$filename"
         ;;
     esac
   fi
 
+  # Regardless of whether we used an absolute or environmental shebang,
+  # the new file should be executable.
   chmod +x "$filename"
 fi
 
+# Regardless of whether we created a new file or it already existed,
+# we'll try to open it in an editor.
 if [ -n "$VISUAL" -a -e "$VISUAL" ]; then
+  # We try VISUAL first.
   exec "$VISUAL" "$filename"
 
 elif [ -n "$EDITOR" -a -e "$EDITOR" ]; then
+  # We try EDITOR second.
   exec "$EDITOR" "$filename"
 
 else
-  echo "Created $filename (or it already exists)"
-  echo "Couldn't find \$VISUAL or \$EDITOR"
+  # We have no third try; we simply exit cleanly.
+  echogood "Created $filename (or it already exists)"
+  echowarn "Couldn't find \$VISUAL or \$EDITOR; exiting without editing"
 fi
